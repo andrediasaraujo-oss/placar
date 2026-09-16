@@ -209,7 +209,7 @@
     </div>
 
     <div class="fineprint">A conexão usa WebRTC (a mesma tecnologia de chamadas de vídeo no navegador) e um serviço público gratuito só para os aparelhos se encontrarem uma vez — depois disso os dados trafegam direto entre os dois aparelhos, em tempo real.</div>
-    <div class="fineprint" style="opacity:0.4;">build: 2026-09-16-4</div>
+    <div class="fineprint" style="opacity:0.4;">build: 2026-09-16-5</div>
   </div>
 
   <!-- DISPLAY (TV) -->
@@ -308,6 +308,8 @@
   "use strict";
 
   function libraryMissing(){ return typeof Peer === "undefined"; }
+  var PEER_OPTS = { host: "0.peerjs.com", port: 443, path: "/", secure: true, debug: 0 };
+  function newPeer(id){ return id ? new Peer(id, PEER_OPTS) : new Peer(PEER_OPTS); }
   function waitForPeerLib(cb){
     if (typeof Peer !== "undefined"){ cb(true); return; }
     var waited = 0;
@@ -426,7 +428,7 @@
   function doStartAsHost(code, statusEl){
     var opened = false;
     try {
-      peer = new Peer(code);
+      peer = newPeer(code);
     } catch(e){
       statusEl.className = "err"; statusEl.textContent = "Erro ao iniciar: " + e.message + " (typeof Peer=" + typeof Peer + ")";
       return;
@@ -469,7 +471,7 @@
     if (reconnectTimer) return;
     reconnectTimer = setInterval(function(){
       if (activeConn && activeConn.open) { clearInterval(reconnectTimer); reconnectTimer = null; return; }
-      if (!peer || peer.destroyed) { peer = new Peer(); peer.on("open", function(){ var c = peer.connect(code, {reliable:true}); wireClientConn(c, code); }); }
+      if (!peer || peer.destroyed) { peer = newPeer(); peer.on("open", function(){ var c = peer.connect(code, {reliable:true}); wireClientConn(c, code); }); }
       else if (peer.open) { var c2 = peer.connect(code, {reliable:true}); wireClientConn(c2, code); }
     }, 3000);
   }
@@ -487,7 +489,7 @@
     });
   }
   function doStartAsClient(code, statusEl){
-    try { peer = new Peer(); } catch(e){ statusEl.className = "err"; statusEl.textContent = "Erro ao iniciar: " + e.message; return; }
+    try { peer = newPeer(); } catch(e){ statusEl.className = "err"; statusEl.textContent = "Erro ao iniciar: " + e.message; return; }
     var settled = false;
     setTimeout(function(){ if (!settled){ statusEl.className = "err"; statusEl.textContent = "Sem resposta em 12s. Confira a internet do celular e o código."; } }, 12000);
     peer.on("open", function(){
@@ -721,7 +723,7 @@
       showScreen("control");
       waitForPeerLib(function(ok){
         if (!ok){ setConnStatus("bad", "Não consegui carregar a biblioteca de conexão. Verifique a internet ou toque em Mudar modo."); return; }
-        var p = new Peer();
+        var p = newPeer();
         p.on("open", function(){ peer = p; var c = peer.connect(pairedCode, {reliable:true}); wireClientConn(c, pairedCode); });
         p.on("error", function(){ setConnStatus("bad", "Não foi possível reconectar. Toque em Mudar modo para parear de novo."); });
       });
