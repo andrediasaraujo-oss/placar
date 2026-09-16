@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Placar de Judô</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg: #0b0d12;
+    --panel: #11141b;
+    --panel-2: #171b24;
+    --line: rgba(255,255,255,0.09);
+    --muted: rgba(255,255,255,0.56);
+    --text: #f4f6fb;
+    --shiro-bg: #f2efe6;
+    --shiro-ink: #15171c;
+    --ao-bg: #17325e;
+    --ao-bg-2: #1d3d73;
+    --ao-ink: #f4f6fb;
+    --gold: #d4a03c;
+    --gold-ink: #2a1f08;
+    --red: #c1352b;
+    --green: #3f9d5c;
+    --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{ margin:0; background:var(--bg); color:var(--text); font-family: var(--sans); -webkit-tap-highlight-color: transparent; overflow-x:hidden; }
+  button{ font-family: inherit; cursor:pointer; }
+  input{ font-family: inherit; }
+  [hidden]{ display:none !important; }
+  code{ background: var(--panel-2); padding:0.1rem 0.4rem; border-radius:4px; font-size:0.9em; }
+
+  #pairing-screen{ min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 6vh 6vw; text-align:center; gap: 1.6rem; }
+  #pairing-screen .mark{ font-family: var(--display); font-weight:800; letter-spacing:0.01em; font-size: clamp(1.9rem, 5.5vw, 3rem); line-height:1; }
+  #pairing-screen .mark span{ color: var(--gold); }
+  #pairing-screen p{ color: var(--muted); max-width: 40ch; margin:0 auto; font-size: 0.95rem; line-height:1.5; }
+  .role-options{ display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; }
+  .role-card{ width: 220px; padding: 1.8rem 1.2rem; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--text); display:flex; flex-direction:column; align-items:center; gap:0.6rem; transition: border-color .15s ease, transform .15s ease; }
+  .role-card:active{ transform: scale(0.97); }
+  .role-card:hover{ border-color: var(--gold); }
+  .role-card .icon{ font-size: 2rem; }
+  .role-card .title{ font-weight:700; font-size:1.05rem; }
+  .role-card .sub{ color:var(--muted); font-size:0.85rem; }
+
+  .pairing-card{ max-width: 420px; width:100%; background: var(--panel); border:1px solid var(--line); border-radius:14px; padding: 1.4rem; display:flex; flex-direction:column; gap:0.8rem; }
+  .pairing-card label{ font-size:0.8rem; color: var(--muted); text-align:left; }
+  .pairing-card input{ width:100%; background: var(--panel-2); border:1px solid var(--line); border-radius:8px; color:var(--text); padding: 0.8rem; font-size:1.4rem; text-align:center; letter-spacing:0.15em; font-family: var(--display); font-weight:700; text-transform:uppercase; }
+  .pairing-card button{ padding: 0.8rem; border-radius:8px; border:none; background: var(--gold); color: var(--gold-ink); font-weight:700; font-size:0.95rem; }
+  .pairing-card .back-link{ background:none; color: var(--muted); font-size:0.8rem; border:none; padding:0.3rem; }
+  #pairing-status{ font-size:0.85rem; color: var(--muted); min-height:1.2em; }
+  #pairing-status.err{ color:#ff9a90; }
+  #pairing-screen .fineprint{ color: var(--muted); font-size:0.72rem; max-width:42ch; margin: 0 auto; }
+
+  .switch-role{ background:none; border:1px solid var(--line); color: var(--muted); padding: 0.4rem 0.8rem; border-radius: 999px; font-size:0.75rem; }
+  .switch-row{ display:flex; gap:0.6rem; justify-content:center; flex-wrap:wrap; }
+
+  #conn-status{ position:fixed; top:0; left:0; right:0; z-index:50; text-align:center; font-size:0.8rem; padding:0.35rem; letter-spacing:0.02em; }
+  #conn-status.ok{ background: var(--green); color:#04150a; }
+  #conn-status.bad{ background: var(--red); color:#fff; }
+
+  #display-screen{ height:100vh; width:100vw; display:flex; flex-direction:column; background: var(--bg); position:relative; }
+  .band{ flex: 1; display:flex; align-items:stretch; min-height:0; position:relative; }
+  .band-shiro{ background: var(--shiro-bg); color: var(--shiro-ink); }
+  .band-ao{ background: linear-gradient(180deg, var(--ao-bg-2), var(--ao-bg)); color: var(--ao-ink); }
+  .band .name-col{ flex: 1.3; display:flex; flex-direction:column; justify-content:center; padding: 2vh clamp(1.2rem, 3vw, 3rem); min-width:0; }
+  .band .swatch{ width:1.5vh; height: 3.4vh; border-radius:3px; margin-bottom:1vh; }
+  .band-shiro .swatch{ background:#c9c2ac; }
+  .band-ao .swatch{ background:var(--gold); }
+  .band .athlete-name{ font-family: var(--display); font-weight:700; font-size: clamp(1.6rem, 4vw, 3.2rem); line-height:1.05; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .band .athlete-team{ font-size: clamp(0.75rem, 1.2vw, 1rem); letter-spacing:0.06em; text-transform:uppercase; color: currentColor; opacity:0.55; margin-top:0.4vh; }
+  .score-col{ flex: 2.2; display:flex; align-items:stretch; }
+  .score-cell{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-left: 1px solid rgba(0,0,0,0.08); }
+  .band-ao .score-cell{ border-left-color: rgba(255,255,255,0.1); }
+  .score-cell .label{ font-size: clamp(0.7rem, 1vw, 0.95rem); letter-spacing:0.08em; opacity:0.55; margin-bottom:0.3vh; }
+  .score-cell .value{ font-family: var(--display); font-weight:800; font-size: clamp(2.6rem, 7.5vw, 6.5rem); line-height:1; font-variant-numeric: tabular-nums; }
+  .shido-cell{ flex: 0 0 clamp(3.2rem, 6vw, 6rem); display:flex; flex-direction:column; align-items:center; justify-content:center; background: var(--red); color:#fff; }
+  .shido-cell .label{ opacity:0.85; }
+  .shido-cell .value{ font-family: var(--display); font-weight:800; font-size: clamp(2rem, 5.5vw, 4rem); }
+
+  #info-bar{ flex: 0 0 clamp(6rem, 22vh, 13rem); background: var(--panel); display:flex; align-items:center; justify-content:space-between; padding: 0 clamp(1.2rem, 3vw, 3rem); border-top: 2px solid var(--gold); }
+  #info-left{ display:flex; flex-direction:column; gap:0.2rem; min-width:0; }
+  #info-left .category{ font-weight:600; font-size: clamp(1rem, 1.8vw, 1.3rem); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #info-left .phase{ color: var(--gold); font-size: clamp(0.8rem, 1.3vw, 1rem); letter-spacing:0.04em; }
+  #info-right{ display:flex; align-items:center; gap:1rem; }
+  #golden-badge{ font-family: var(--display); font-weight:700; letter-spacing:0.05em; font-size: clamp(0.8rem, 1.5vw, 1.1rem); color: var(--gold-ink); background: var(--gold); padding:0.25rem 0.8rem; border-radius:6px; }
+  #timer-display{ font-family: var(--display); font-weight:800; color: var(--gold); font-size: clamp(4.5rem, 15vw, 11rem); line-height:1; font-variant-numeric: tabular-nums; }
+  #timer-display.running{ color: #eebb55; }
+  #timer-display.paused-zero{ color: var(--red); }
+  #display-switch-role{ position:absolute; bottom:0.6rem; right:0.8rem; opacity:0.35; z-index:5; }
+  #display-switch-role:hover{ opacity:1; }
+  #display-waiting{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color: var(--muted); font-size:1.1rem; background: var(--bg); text-align:center; padding: 2rem; }
+  #osaekomi-live{ position:absolute; top:1.2vh; left:50%; transform: translateX(-50%); background: var(--gold); color: var(--gold-ink); padding: 0.7rem 2.2rem; border-radius: 28px; font-family: var(--display); font-weight:800; letter-spacing:0.06em; z-index:6; display:flex; align-items:baseline; gap:1rem; }
+  #osaekomi-live > span:first-child{ font-size: clamp(1rem, 2vw, 1.6rem); }
+  #osaekomi-live-time{ font-size: clamp(3rem, 9vw, 6.5rem); font-variant-numeric: tabular-nums; }
+  #tv-code-badge{ position:absolute; bottom:0.6rem; left:0.8rem; font-size:0.7rem; color: rgba(255,255,255,0.35); z-index:5; }
+
+  #control-screen{ min-height:100vh; padding-bottom: 3rem; }
+  #control-top{ position: sticky; top:0; z-index:10; background: var(--panel); border-bottom: 1px solid var(--line); padding: 0.9rem 1rem; display:flex; align-items:center; gap:0.8rem; }
+  #ctrl-timer{ font-family: var(--display); font-weight:800; font-size:3.6rem; color:var(--gold); font-variant-numeric: tabular-nums; min-width:3.6ch; }
+  #ctrl-timer.paused-zero{ color: var(--red); }
+  .timer-btns{ display:flex; gap:0.5rem; flex:1; }
+  .timer-btns button{ flex:1; border-radius:10px; border:1px solid var(--line); background: var(--panel-2); color: var(--text); padding: 0.7rem 0.4rem; font-weight:600; font-size:0.85rem; }
+  #ctrl-start-pause{ background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+  #ctrl-start-pause.is-running{ background: var(--red); color:#fff; border-color: var(--red); }
+
+  #control-body{ padding: 1rem; max-width: 560px; margin: 0 auto; }
+  details#setup-panel{ background: var(--panel); border:1px solid var(--line); border-radius:12px; margin-bottom:1rem; overflow:hidden; }
+  details#setup-panel summary{ padding: 0.9rem 1rem; font-weight:600; list-style:none; display:flex; align-items:center; justify-content:space-between; }
+  details#setup-panel summary::-webkit-details-marker{ display:none; }
+  #setup-panel .setup-body{ padding: 0 1rem 1rem; display:flex; flex-direction:column; gap:0.8rem; }
+  .field{ display:flex; flex-direction:column; gap:0.3rem; }
+  .field label{ font-size:0.78rem; color: var(--muted); }
+  .field input{ background: var(--panel-2); border:1px solid var(--line); border-radius:8px; color:var(--text); padding: 0.6rem 0.7rem; font-size:0.95rem; }
+  .preset-row{ display:flex; gap:0.5rem; }
+  .preset-row button{ flex:1; padding:0.55rem; border-radius:8px; border:1px solid var(--line); background: var(--panel-2); color:var(--text); }
+  .setup-actions{ display:flex; gap:0.6rem; }
+  .setup-actions button{ flex:1; padding:0.6rem; border-radius:8px; border:1px solid var(--line); background: var(--panel-2); color:var(--text); font-size:0.8rem; }
+  #btn-reset-scores{ border-color: var(--red); color: #ff9a90; }
+  #btn-new-fight{ border-color: var(--red); background: var(--red); color: #fff; font-weight:700; }
+  #btn-start-golden{ border-color: var(--gold); color: var(--gold); }
+  .sync-code-row{ font-size:0.9rem; color: var(--text); word-break: break-all; background: var(--panel-2); border-radius:8px; padding:0.5rem 0.7rem; font-family: var(--display); letter-spacing:0.1em; text-align:center; }
+
+  #osaekomi-panel{ background: var(--panel); border:1px solid var(--line); border-radius:12px; margin-bottom:1rem; padding: 0.9rem 1rem; }
+  .osaekomi-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:0.7rem; }
+  .osaekomi-head .title{ font-weight:700; font-size:0.95rem; }
+  #osaekomi-time{ font-family: var(--display); font-weight:800; font-size:3rem; color: var(--gold); font-variant-numeric: tabular-nums; }
+  #osaekomi-tag{ font-size:0.75rem; font-weight:700; letter-spacing:0.05em; padding:0.15rem 0.55rem; border-radius:6px; background: var(--panel-2); color: var(--muted); min-width:5.5ch; text-align:center; }
+  #osaekomi-tag.tag-yuko{ background: rgba(212,160,60,0.18); color: var(--gold); }
+  #osaekomi-tag.tag-wazaari{ background: rgba(212,160,60,0.32); color: var(--gold); }
+  #osaekomi-tag.tag-ippon{ background: var(--red); color:#fff; }
+  .osaekomi-athletes{ display:flex; gap:0.6rem; margin-bottom:0.6rem; }
+  .osaekomi-chip{ flex:1; padding:0.7rem; border-radius:10px; border:2px solid var(--line); background: var(--panel-2); color: var(--text); font-weight:700; font-size:0.9rem; }
+  .osaekomi-chip.chip-shiro.active{ background: var(--shiro-bg); color: var(--shiro-ink); border-color: var(--shiro-bg); }
+  .osaekomi-chip.chip-ao.active{ background: linear-gradient(180deg, var(--ao-bg-2), var(--ao-bg)); color: var(--ao-ink); border-color: var(--ao-bg); }
+  .osaekomi-actions{ display:flex; gap:0.6rem; }
+  .osaekomi-actions button{ flex:1; padding:0.65rem; border-radius:8px; border:1px solid var(--line); background: var(--panel-2); color:var(--text); font-size:0.85rem; font-weight:600; }
+  #osaekomi-toque{ border-color: var(--green); color: var(--green); }
+  #osaekomi-cancel{ border-color: var(--red); color: #ff9a90; }
+  .osaekomi-hint{ font-size:0.72rem; color: var(--muted); margin-top:0.5rem; line-height:1.4; }
+
+  .athlete-card{ border-radius:14px; margin-bottom:1rem; overflow:hidden; border:1px solid var(--line); }
+  .athlete-card .header{ display:flex; align-items:center; gap:0.7rem; padding: 0.9rem 1rem; }
+  .card-shiro .header{ background: var(--shiro-bg); color: var(--shiro-ink); }
+  .card-ao .header{ background: linear-gradient(180deg, var(--ao-bg-2), var(--ao-bg)); color: var(--ao-ink); }
+  .athlete-card .header input{ flex:1; background:transparent; border:none; font-family: var(--display); font-weight:700; font-size:1.3rem; color:inherit; padding:0.2rem 0; }
+  .athlete-card .header .swatch{ width:0.8rem; height:1.6rem; border-radius:3px; flex:0 0 auto; }
+  .card-shiro .swatch{ background:#c9c2ac; }
+  .card-ao .swatch{ background: var(--gold); }
+  .athlete-card .body{ background: var(--panel); padding: 0.6rem 0.9rem 0.9rem; }
+  .stat-row{ display:flex; align-items:center; gap:0.8rem; padding: 0.55rem 0; border-bottom: 1px solid var(--line); }
+  .stat-row:last-child{ border-bottom:none; }
+  .stat-row .stat-label{ flex: 1.2; font-size:0.85rem; letter-spacing:0.04em; color: var(--muted); }
+  .stat-row .stat-value{ font-family: var(--display); font-weight:800; font-size:1.7rem; width:2.4ch; text-align:center; font-variant-numeric: tabular-nums; }
+  .stat-row.shido-row .stat-value{ color: #ff9a90; }
+  .stat-row .stepper{ display:flex; gap:0.4rem; }
+  .stepper button{ width:2.6rem; height:2.6rem; border-radius:50%; border:1px solid var(--line); background: var(--panel-2); color: var(--text); font-size:1.3rem; font-weight:700; display:flex; align-items:center; justify-content:center; line-height:1; }
+  .stepper button:active{ transform: scale(0.92); }
+
+  #control-bottom{ max-width:560px; margin: 0 auto; padding: 0 1rem; }
+
+  @media (max-width: 380px){
+    .stat-row .stat-label{ font-size:0.78rem; }
+    .stepper button{ width:2.3rem; height:2.3rem; }
+  }
+</style>
+</head>
+<body>
+
+  <div id="conn-status" hidden></div>
+
+  <!-- PAIRING (role + peer-to-peer connection, no login) -->
+  <div id="pairing-screen">
+    <div class="mark">Placar de <span>Judô</span></div>
+    <p id="pairing-intro">Este placar conecta o celular e a TV diretamente entre si (sem servidor no meio), sem precisar de nenhuma conta.</p>
+
+    <div id="pairing-step-role" class="role-options">
+      <button class="role-card" id="btn-role-display">
+        <span class="icon">📺</span>
+        <span class="title">Placar (TV)</span>
+        <span class="sub">Comece por aqui na Smart TV</span>
+      </button>
+      <button class="role-card" id="btn-role-control">
+        <span class="icon">📱</span>
+        <span class="title">Controle (celular)</span>
+        <span class="sub">Depois conecte o celular</span>
+      </button>
+    </div>
+
+    <div id="pairing-step-host" class="pairing-card" hidden>
+      <label for="in-host-code">Código desta TV (edite se quiser um mais fácil)</label>
+      <input id="in-host-code" type="text" maxlength="8">
+      <button id="btn-activate-host">Ativar placar</button>
+      <button class="back-link" id="btn-back-from-host">← Voltar</button>
+      <div id="pairing-status"></div>
+    </div>
+
+    <div id="pairing-step-client" class="pairing-card" hidden>
+      <label for="in-client-code">Código mostrado na TV</label>
+      <input id="in-client-code" type="text" maxlength="8" placeholder="ex.: JU7QK2">
+      <button id="btn-connect-client">Conectar</button>
+      <button class="back-link" id="btn-back-from-client">← Voltar</button>
+      <div id="pairing-status2"></div>
+    </div>
+
+    <div class="fineprint">A conexão usa WebRTC (a mesma tecnologia de chamadas de vídeo no navegador) e um serviço público gratuito só para os aparelhos se encontrarem uma vez — depois disso os dados trafegam direto entre os dois aparelhos, em tempo real.</div>
+  </div>
+
+  <!-- DISPLAY (TV) -->
+  <div id="display-screen" hidden>
+    <div id="osaekomi-live" hidden><span>OSAEKOMI</span><span id="osaekomi-live-time">00</span></div>
+    <div class="band band-shiro" id="band-top">
+      <div class="name-col"><div class="swatch"></div><div class="athlete-name" id="disp-name-top">Atleta Branco</div><div class="athlete-team" id="disp-team-top"></div></div>
+      <div class="score-col">
+        <div class="score-cell"><div class="label">IPPON</div><div class="value" id="disp-ippon-top">0</div></div>
+        <div class="score-cell"><div class="label">WAZA-ARI</div><div class="value" id="disp-wazaari-top">0</div></div>
+        <div class="score-cell"><div class="label">YUKO</div><div class="value" id="disp-yuko-top">0</div></div>
+      </div>
+      <div class="shido-cell"><div class="label">SHIDO</div><div class="value" id="disp-shido-top">0</div></div>
+    </div>
+    <div class="band band-ao" id="band-bottom">
+      <div class="name-col"><div class="swatch"></div><div class="athlete-name" id="disp-name-bottom">Atleta Azul</div><div class="athlete-team" id="disp-team-bottom"></div></div>
+      <div class="score-col">
+        <div class="score-cell"><div class="label">IPPON</div><div class="value" id="disp-ippon-bottom">0</div></div>
+        <div class="score-cell"><div class="label">WAZA-ARI</div><div class="value" id="disp-wazaari-bottom">0</div></div>
+        <div class="score-cell"><div class="label">YUKO</div><div class="value" id="disp-yuko-bottom">0</div></div>
+      </div>
+      <div class="shido-cell"><div class="label">SHIDO</div><div class="value" id="disp-shido-bottom">0</div></div>
+    </div>
+    <div id="info-bar">
+      <div id="info-left"><div class="category" id="disp-category">Categoria</div><div class="phase" id="disp-phase">Combate</div></div>
+      <div id="info-right"><div id="golden-badge" hidden>OURO</div><div id="timer-display">04:00</div></div>
+    </div>
+    <button class="switch-role" id="display-switch-role">Mudar modo</button>
+    <div id="tv-code-badge"></div>
+    <div id="display-waiting" hidden>Aguardando o celular se conectar…</div>
+  </div>
+
+  <!-- CONTROL (phone) -->
+  <div id="control-screen" hidden>
+    <div id="control-top">
+      <div id="ctrl-timer">04:00</div>
+      <div class="timer-btns">
+        <button id="ctrl-start-pause">Iniciar</button>
+        <button id="ctrl-reset-timer">Zerar</button>
+      </div>
+    </div>
+    <div id="control-body">
+      <details id="setup-panel">
+        <summary>Configurar partida ▾</summary>
+        <div class="setup-body">
+          <div class="field"><label for="in-category">Categoria</label><input id="in-category" type="text" placeholder="ex.: masculino -90kg"></div>
+          <div class="field"><label for="in-phase">Fase</label><input id="in-phase" type="text" placeholder="ex.: Final"></div>
+          <div class="field">
+            <label>Duração do combate (tempo normal)</label>
+            <div class="preset-row"><button data-duration="180">3:00</button><button data-duration="240">4:00</button><button data-duration="300">5:00</button></div>
+          </div>
+          <div class="setup-actions"><button id="btn-start-golden">Iniciar Golden Score</button><button id="btn-end-golden">Voltar ao tempo normal</button></div>
+          <div class="setup-actions"><button id="btn-swap-sides">Trocar lados no placar</button></div>
+          <div class="setup-actions"><button id="btn-reset-scores">Zerar pontuação e cronômetro</button></div>
+          <div class="setup-actions"><button id="btn-new-fight">Nova luta (reseta tudo)</button></div>
+          <div class="field"><label>Código da TV conectada</label><div class="sync-code-row" id="sync-code-display">—</div></div>
+        </div>
+      </details>
+
+      <div id="osaekomi-panel">
+        <div class="osaekomi-head"><span class="title">Osaekomi</span><span id="osaekomi-tag"></span><span id="osaekomi-time">00</span></div>
+        <div class="osaekomi-athletes"><button class="osaekomi-chip chip-shiro" id="osaekomi-a">Branco</button><button class="osaekomi-chip chip-ao" id="osaekomi-b">Azul</button></div>
+        <div class="osaekomi-actions"><button id="osaekomi-toque">Toketa (pontuar)</button><button id="osaekomi-cancel">Cancelar</button></div>
+        <div class="osaekomi-hint">Toque em Branco/Azul para iniciar o imobilizado; toque no outro lado a qualquer momento para corrigir o atleta sem reiniciar o relógio. 5–9s = Yuko · 10–19s = Waza-ari · 20s = Ippon automático.</div>
+      </div>
+
+      <div class="athlete-card card-shiro">
+        <div class="header"><div class="swatch"></div><input id="in-name-a" type="text" placeholder="Nome do atleta"></div>
+        <div class="body">
+          <div class="stat-row"><div class="stat-label">IPPON</div><div class="stat-value" id="val-a-ippon">0</div><div class="stepper"><button data-a="a" data-field="ippon" data-delta="-1">−</button><button data-a="a" data-field="ippon" data-delta="1">+</button></div></div>
+          <div class="stat-row"><div class="stat-label">WAZA-ARI</div><div class="stat-value" id="val-a-wazaari">0</div><div class="stepper"><button data-a="a" data-field="wazaari" data-delta="-1">−</button><button data-a="a" data-field="wazaari" data-delta="1">+</button></div></div>
+          <div class="stat-row"><div class="stat-label">YUKO</div><div class="stat-value" id="val-a-yuko">0</div><div class="stepper"><button data-a="a" data-field="yuko" data-delta="-1">−</button><button data-a="a" data-field="yuko" data-delta="1">+</button></div></div>
+          <div class="stat-row shido-row"><div class="stat-label">SHIDO</div><div class="stat-value" id="val-a-shido">0</div><div class="stepper"><button data-a="a" data-field="shido" data-delta="-1">−</button><button data-a="a" data-field="shido" data-delta="1">+</button></div></div>
+        </div>
+      </div>
+
+      <div class="athlete-card card-ao">
+        <div class="header"><div class="swatch"></div><input id="in-name-b" type="text" placeholder="Nome do atleta"></div>
+        <div class="body">
+          <div class="stat-row"><div class="stat-label">IPPON</div><div class="stat-value" id="val-b-ippon">0</div><div class="stepper"><button data-a="b" data-field="ippon" data-delta="-1">−</button><button data-a="b" data-field="ippon" data-delta="1">+</button></div></div>
+          <div class="stat-row"><div class="stat-label">WAZA-ARI</div><div class="stat-value" id="val-b-wazaari">0</div><div class="stepper"><button data-a="b" data-field="wazaari" data-delta="-1">−</button><button data-a="b" data-field="wazaari" data-delta="1">+</button></div></div>
+          <div class="stat-row"><div class="stat-label">YUKO</div><div class="stat-value" id="val-b-yuko">0</div><div class="stepper"><button data-a="b" data-field="yuko" data-delta="-1">−</button><button data-a="b" data-field="yuko" data-delta="1">+</button></div></div>
+          <div class="stat-row shido-row"><div class="stat-label">SHIDO</div><div class="stat-value" id="val-b-shido">0</div><div class="stepper"><button data-a="b" data-field="shido" data-delta="-1">−</button><button data-a="b" data-field="shido" data-delta="1">+</button></div></div>
+        </div>
+      </div>
+    </div>
+    <div id="control-bottom">
+      <div class="switch-row">
+        <button class="switch-role" id="control-switch-role">Mudar modo</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  function libraryMissing(){ return typeof Peer === "undefined"; }
+  var activeConn = null;
+  var myRole = null;        // 'display' | 'control'
+  var pairedCode = null;    // the TV's code, known by both sides
+  var lastAutoPausedRunningSince = null;
+  var lastAutoIpponStartedAt = null;
+  var firstStateApplied = false;
+
+  try { myRole = localStorage.getItem("judo_role"); } catch(e){}
+  try { pairedCode = localStorage.getItem("judo_peer_code"); } catch(e){}
+
+  // ---------- sound alerts ----------
+  var audioCtx = null;
+  function getAudioCtx(){ if (!audioCtx){ try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ audioCtx = null; } } return audioCtx; }
+  document.addEventListener("click", function(){ var ctx = getAudioCtx(); if (ctx && ctx.state === "suspended") ctx.resume(); });
+  function beep(freq, durMs, delayMs, type){
+    var ctx = getAudioCtx(); if (!ctx) return;
+    setTimeout(function(){
+      try{
+        var osc = ctx.createOscillator(); var gain = ctx.createGain();
+        osc.type = type || "square"; osc.frequency.value = freq;
+        var t0 = ctx.currentTime;
+        gain.gain.setValueAtTime(0.001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.32, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + durMs / 1000);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(t0); osc.stop(t0 + durMs / 1000 + 0.03);
+      } catch(e){}
+    }, delayMs || 0);
+  }
+  function playTimeUp(){ beep(220, 650, 0, "sawtooth"); beep(220, 650, 750, "sawtooth"); }
+  function playIppon(){ beep(920, 160, 0, "square"); beep(920, 160, 210, "square"); }
+  function playSecondWazaAri(){ beep(680, 110, 0, "square"); beep(680, 110, 160, "square"); beep(680, 110, 320, "square"); }
+  function detectAndPlaySounds(prev, next){
+    if (prev.timer && next.timer && prev.timer.direction === "down" && next.timer.direction === "down" &&
+        prev.timer.running && !next.timer.running && next.timer.remaining <= 0){ playTimeUp(); }
+    ["athleteA", "athleteB"].forEach(function(k){
+      var p = prev[k] || {}, n = next[k] || {};
+      if ((n.ippon || 0) > (p.ippon || 0)) playIppon();
+      if ((n.wazaari || 0) === 2 && (p.wazaari || 0) === 1) playSecondWazaAri();
+    });
+  }
+
+  function defaultState(){
+    return {
+      category: "Categoria", phase: "Combate",
+      athleteA: { name: "Atleta Branco", team: "", ippon: 0, wazaari: 0, yuko: 0, shido: 0 },
+      athleteB: { name: "Atleta Azul", team: "", ippon: 0, wazaari: 0, yuko: 0, shido: 0 },
+      timer: { duration: 240, remaining: 240, running: false, runningSince: null, direction: "down" },
+      osaekomi: { running: false, athlete: null, startedAt: null, baseSeconds: 0 },
+      golden: false, swapped: false
+    };
+  }
+  var state = defaultState();
+  function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
+  function mergeIncoming(data){
+    var d = defaultState();
+    return Object.assign(d, data || {}, {
+      athleteA: Object.assign({}, d.athleteA, (data && data.athleteA) || {}),
+      athleteB: Object.assign({}, d.athleteB, (data && data.athleteB) || {}),
+      timer: Object.assign({}, d.timer, (data && data.timer) || {}),
+      osaekomi: Object.assign({}, d.osaekomi, (data && data.osaekomi) || {})
+    });
+  }
+  function applyNewState(newState){
+    var prev = state; state = newState;
+    if (firstStateApplied){ detectAndPlaySounds(prev, state); } else { firstStateApplied = true; }
+    renderAll();
+  }
+  function sendState(newState){ if (activeConn && activeConn.open){ try { activeConn.send(newState); } catch(e){} } }
+  function commit(newState){ applyNewState(newState); sendState(newState); }
+
+  // ---------- connection status ----------
+  function setConnStatus(kind, text){
+    var el = document.getElementById("conn-status");
+    if (!el) return;
+    if (kind === "hidden"){ el.hidden = true; return; }
+    el.hidden = false; el.className = kind; el.textContent = text;
+  }
+
+  // ---------- pairing / WebRTC (peer-to-peer, no login) ----------
+  function randomCode(){
+    var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    var out = "";
+    for (var i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
+    return out;
+  }
+
+  function wireHostConn(conn){
+    activeConn = conn;
+    conn.on("open", function(){ setConnStatus("ok", "Celular conectado"); setTimeout(function(){ setConnStatus("hidden"); }, 2000); sendState(state); var w = document.getElementById("display-waiting"); if (w) w.hidden = true; });
+    conn.on("data", function(data){ applyNewState(mergeIncoming(data)); });
+    conn.on("close", function(){ setConnStatus("bad", "Celular desconectado — aguardando reconexão…"); activeConn = null; var w = document.getElementById("display-waiting"); if (w) w.hidden = false; });
+    conn.on("error", function(){ setConnStatus("bad", "Erro de conexão com o celular"); });
+  }
+
+  function startAsHost(code){
+    var statusEl = document.getElementById("pairing-status");
+    statusEl.className = ""; statusEl.textContent = "Ativando…";
+    if (libraryMissing()){
+      statusEl.className = "err";
+      statusEl.textContent = "Não consegui carregar a biblioteca de conexão (peerjs.com). Pode ser bloqueio do site que hospeda este arquivo, ou falta de internet na TV.";
+      return;
+    }
+    var opened = false;
+    try {
+      peer = new Peer(code);
+    } catch(e){
+      statusEl.className = "err"; statusEl.textContent = "Erro ao iniciar: " + e.message;
+      return;
+    }
+    setTimeout(function(){
+      if (!opened){ statusEl.className = "err"; statusEl.textContent = "Sem resposta do serviço de pareamento em 12s. Confira a internet da TV e tente de novo."; }
+    }, 12000);
+    peer.on("open", function(){
+      opened = true;
+      myRole = "display"; pairedCode = code;
+      try { localStorage.setItem("judo_role", "display"); localStorage.setItem("judo_peer_code", code); } catch(e){}
+      showScreen("display");
+      var badge = document.getElementById("tv-code-badge"); if (badge) badge.textContent = "código: " + code;
+      var w = document.getElementById("display-waiting"); if (w) w.hidden = false;
+    });
+    peer.on("connection", wireHostConn);
+    peer.on("disconnected", function(){ setConnStatus("bad", "Sem conexão com o serviço de pareamento — tentando religar…"); try { peer.reconnect(); } catch(e){} });
+    peer.on("error", function(err){
+      opened = true;
+      if (err && err.type === "unavailable-id"){ statusEl.className = "err"; statusEl.textContent = "Esse código já está em uso agora. Tente outro."; }
+      else { statusEl.className = "err"; statusEl.textContent = "Não consegui ativar (" + (err && err.type || err) + "). Tente outro código ou verifique a internet da TV."; }
+    });
+  }
+
+  function wireClientConn(conn, code){
+    activeConn = conn;
+    conn.on("open", function(){
+      myRole = "control"; pairedCode = code;
+      try { localStorage.setItem("judo_role", "control"); localStorage.setItem("judo_peer_code", code); } catch(e){}
+      showScreen("control");
+      setConnStatus("ok", "Conectado à TV"); setTimeout(function(){ setConnStatus("hidden"); }, 2000);
+    });
+    conn.on("data", function(data){ applyNewState(mergeIncoming(data)); });
+    conn.on("close", function(){ setConnStatus("bad", "Conexão com a TV perdida — tentando reconectar…"); activeConn = null; attemptClientReconnect(code); });
+    conn.on("error", function(){ setConnStatus("bad", "Erro de conexão com a TV"); });
+  }
+
+  var reconnectTimer = null;
+  function attemptClientReconnect(code){
+    if (reconnectTimer) return;
+    reconnectTimer = setInterval(function(){
+      if (activeConn && activeConn.open) { clearInterval(reconnectTimer); reconnectTimer = null; return; }
+      if (!peer || peer.destroyed) { peer = new Peer(); peer.on("open", function(){ var c = peer.connect(code, {reliable:true}); wireClientConn(c, code); }); }
+      else if (peer.open) { var c2 = peer.connect(code, {reliable:true}); wireClientConn(c2, code); }
+    }, 3000);
+  }
+
+  function startAsClient(code){
+    var statusEl = document.getElementById("pairing-status2");
+    statusEl.className = ""; statusEl.textContent = "Conectando…";
+    if (libraryMissing()){
+      statusEl.className = "err";
+      statusEl.textContent = "Não consegui carregar a biblioteca de conexão (peerjs.com). Pode ser bloqueio do site que hospeda este arquivo, ou falta de internet.";
+      return;
+    }
+    try { peer = new Peer(); } catch(e){ statusEl.className = "err"; statusEl.textContent = "Erro ao iniciar: " + e.message; return; }
+    var settled = false;
+    setTimeout(function(){ if (!settled){ statusEl.className = "err"; statusEl.textContent = "Sem resposta em 12s. Confira a internet do celular e o código."; } }, 12000);
+    peer.on("open", function(){
+      var conn = peer.connect(code, { reliable: true });
+      conn.on("open", function(){ settled = true; wireClientConn(conn, code); });
+      conn.on("error", function(){ if (!settled){ settled = true; statusEl.className = "err"; statusEl.textContent = "Não consegui conectar. Confira o código na TV."; } });
+    });
+    peer.on("error", function(err){ settled = true; statusEl.className = "err"; statusEl.textContent = "Erro (" + (err && err.type || err) + "). Tente de novo."; });
+  }
+
+  // ---------- pairing screen wiring ----------
+  document.getElementById("btn-role-display").addEventListener("click", function(){
+    document.getElementById("pairing-step-role").hidden = true;
+    document.getElementById("pairing-step-host").hidden = false;
+    document.getElementById("in-host-code").value = randomCode();
+  });
+  document.getElementById("btn-role-control").addEventListener("click", function(){
+    document.getElementById("pairing-step-role").hidden = true;
+    document.getElementById("pairing-step-client").hidden = false;
+  });
+  document.getElementById("btn-back-from-host").addEventListener("click", function(){
+    document.getElementById("pairing-step-host").hidden = true;
+    document.getElementById("pairing-step-role").hidden = false;
+  });
+  document.getElementById("btn-back-from-client").addEventListener("click", function(){
+    document.getElementById("pairing-step-client").hidden = true;
+    document.getElementById("pairing-step-role").hidden = false;
+  });
+  document.getElementById("btn-activate-host").addEventListener("click", function(){
+    var code = (document.getElementById("in-host-code").value || "").trim().toUpperCase();
+    if (!code){ var s = document.getElementById("pairing-status"); s.className = "err"; s.textContent = "Digite um código."; return; }
+    startAsHost(code);
+  });
+  document.getElementById("btn-connect-client").addEventListener("click", function(){
+    var code = (document.getElementById("in-client-code").value || "").trim().toUpperCase();
+    if (!code){ var s = document.getElementById("pairing-status2"); s.className = "err"; s.textContent = "Digite o código mostrado na TV."; return; }
+    startAsClient(code);
+  });
+
+  function showScreen(which){
+    document.getElementById("pairing-screen").hidden = true;
+    document.getElementById("display-screen").hidden = which !== "display";
+    document.getElementById("control-screen").hidden = which !== "control";
+    var syncCodeEl = document.getElementById("sync-code-display");
+    if (syncCodeEl) syncCodeEl.textContent = pairedCode || "—";
+  }
+
+  document.getElementById("display-switch-role").addEventListener("click", function(){ forgetPairingAndReload(); });
+  document.getElementById("control-switch-role").addEventListener("click", function(){ forgetPairingAndReload(); });
+  function forgetPairingAndReload(){
+    try { localStorage.removeItem("judo_role"); localStorage.removeItem("judo_peer_code"); } catch(e){}
+    if (peer) { try { peer.destroy(); } catch(e){} }
+    location.reload();
+  }
+
+  // ---------- timer helpers ----------
+  function currentTimerValue(t){
+    if (!t) return 0;
+    var elapsed = (t.running && t.runningSince) ? (Date.now() - t.runningSince) / 1000 : 0;
+    if (t.direction === "up") return Math.max(0, (t.remaining || 0) + elapsed);
+    return Math.max(0, (t.remaining || 0) - elapsed);
+  }
+  function currentOsaekomiValue(o){
+    if (!o) return 0;
+    var elapsed = (o.running && o.startedAt) ? (Date.now() - o.startedAt) / 1000 : 0;
+    return (o.baseSeconds || 0) + elapsed;
+  }
+  function fmt(sec){ sec = Math.ceil(sec); var m = Math.floor(sec / 60); var s = sec % 60; return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0"); }
+  function fmtSeconds(sec){ return String(Math.floor(sec)).padStart(2, "0"); }
+
+  // ---------- render ----------
+  function renderAll(){
+    var a = state.athleteA, b = state.athleteB;
+    var top = state.swapped ? b : a; var bottom = state.swapped ? a : b;
+    var dn = document.getElementById("disp-name-top"); if (dn) dn.textContent = top.name || "—";
+    setText("disp-ippon-top", top.ippon); setText("disp-wazaari-top", top.wazaari); setText("disp-yuko-top", top.yuko); setText("disp-shido-top", top.shido);
+    var dnb = document.getElementById("disp-name-bottom"); if (dnb) dnb.textContent = bottom.name || "—";
+    setText("disp-ippon-bottom", bottom.ippon); setText("disp-wazaari-bottom", bottom.wazaari); setText("disp-yuko-bottom", bottom.yuko); setText("disp-shido-bottom", bottom.shido);
+    var dc = document.getElementById("disp-category"); if (dc) dc.textContent = state.category || "";
+    var dp = document.getElementById("disp-phase"); if (dp) dp.textContent = state.phase || "";
+    var gb = document.getElementById("golden-badge"); if (gb) gb.hidden = !state.golden;
+
+    setInputValue("in-category", state.category); setInputValue("in-phase", state.phase);
+    setInputValue("in-name-a", a.name); setInputValue("in-name-b", b.name);
+    setText("val-a-ippon", a.ippon); setText("val-a-wazaari", a.wazaari); setText("val-a-yuko", a.yuko); setText("val-a-shido", a.shido);
+    setText("val-b-ippon", b.ippon); setText("val-b-wazaari", b.wazaari); setText("val-b-yuko", b.yuko); setText("val-b-shido", b.shido);
+
+    var startPause = document.getElementById("ctrl-start-pause");
+    if (startPause){ startPause.textContent = state.timer.running ? "Pausar" : (state.timer.direction === "up" ? "Retomar" : "Iniciar"); startPause.classList.toggle("is-running", !!state.timer.running); }
+    var oa = document.getElementById("osaekomi-a"), ob = document.getElementById("osaekomi-b");
+    if (oa) oa.classList.toggle("active", state.osaekomi && state.osaekomi.athlete === "a");
+    if (ob) ob.classList.toggle("active", state.osaekomi && state.osaekomi.athlete === "b");
+    var syncCodeEl = document.getElementById("sync-code-display"); if (syncCodeEl) syncCodeEl.textContent = pairedCode || "—";
+
+    updateLiveClocks();
+  }
+  function setText(id, val){ var el = document.getElementById(id); if (el) el.textContent = String(val != null ? val : 0); }
+  function setInputValue(id, val){ var el = document.getElementById(id); if (el && document.activeElement !== el) el.value = val || ""; }
+
+  function updateLiveClocks(){
+    var t = state.timer;
+    var rem = currentTimerValue(t);
+    var isDown = t.direction !== "up";
+    var text = fmt(rem);
+    var atZero = isDown && rem <= 0;
+    var d1 = document.getElementById("timer-display");
+    if (d1){ d1.textContent = text; d1.classList.toggle("running", !!t.running); d1.classList.toggle("paused-zero", atZero && !t.running); }
+    var d2 = document.getElementById("ctrl-timer");
+    if (d2){ d2.textContent = text; d2.classList.toggle("paused-zero", atZero && !t.running); }
+
+    var o = state.osaekomi;
+    var oVal = Math.min(currentOsaekomiValue(o), 20);
+    var ot = document.getElementById("osaekomi-time"); if (ot) ot.textContent = fmtSeconds(oVal);
+    var tag = document.getElementById("osaekomi-tag");
+    if (tag){
+      var label = "", cls = "";
+      if (oVal >= 20){ label = "IPPON"; cls = "tag-ippon"; }
+      else if (oVal >= 10){ label = "WAZA-ARI"; cls = "tag-wazaari"; }
+      else if (oVal >= 5){ label = "YUKO"; cls = "tag-yuko"; }
+      tag.textContent = label; tag.className = cls;
+    }
+    var live = document.getElementById("osaekomi-live");
+    if (live){
+      live.hidden = !(o && o.running);
+      if (o && o.running){
+        live.classList.toggle("side-shiro", o.athlete === "a"); live.classList.toggle("side-ao", o.athlete === "b");
+        var lt = document.getElementById("osaekomi-live-time"); if (lt) lt.textContent = fmtSeconds(oVal);
+      }
+    }
+
+    if (myRole === "control"){
+      if (isDown && t.running && rem <= 0 && lastAutoPausedRunningSince !== t.runningSince){
+        lastAutoPausedRunningSince = t.runningSince;
+        var s1 = clone(state); s1.timer.running = false; s1.timer.remaining = 0; s1.timer.runningSince = null;
+        commit(s1);
+      }
+      if (o && o.running && oVal >= 20 && lastAutoIpponStartedAt !== o.startedAt){
+        lastAutoIpponStartedAt = o.startedAt;
+        stopOsaekomi(true);
+      }
+    }
+  }
+  setInterval(updateLiveClocks, 200);
+
+  // ---------- score actions ----------
+  document.querySelectorAll(".stepper button").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var athleteKey = btn.getAttribute("data-a") === "a" ? "athleteA" : "athleteB";
+      var field = btn.getAttribute("data-field");
+      var delta = parseInt(btn.getAttribute("data-delta"), 10);
+      var s = clone(state); s[athleteKey][field] = Math.max(0, (s[athleteKey][field] || 0) + delta); commit(s);
+    });
+  });
+  document.getElementById("in-name-a").addEventListener("change", function(e){ var s = clone(state); s.athleteA.name = e.target.value; commit(s); });
+  document.getElementById("in-name-b").addEventListener("change", function(e){ var s = clone(state); s.athleteB.name = e.target.value; commit(s); });
+  document.getElementById("in-category").addEventListener("change", function(e){ var s = clone(state); s.category = e.target.value; commit(s); });
+  document.getElementById("in-phase").addEventListener("change", function(e){ var s = clone(state); s.phase = e.target.value; commit(s); });
+  document.getElementById("btn-swap-sides").addEventListener("click", function(){ var s = clone(state); s.swapped = !s.swapped; commit(s); });
+  document.getElementById("btn-reset-scores").addEventListener("click", function(){
+    if (!confirm("Zerar toda a pontuação, o cronômetro e o osaekomi desta partida?")) return;
+    var s = clone(state);
+    ["athleteA", "athleteB"].forEach(function(k){ s[k].ippon = 0; s[k].wazaari = 0; s[k].yuko = 0; s[k].shido = 0; });
+    s.timer = { duration: s.timer.duration, remaining: s.timer.duration, running: false, runningSince: null, direction: "down" };
+    s.osaekomi = { running: false, athlete: null, startedAt: null, baseSeconds: 0 }; s.golden = false;
+    commit(s);
+  });
+  document.getElementById("btn-new-fight").addEventListener("click", function(){
+    if (!confirm("Iniciar uma nova luta? Isso apaga nomes, categoria, fase, pontuação, cronômetro e osaekomi da luta atual.")) return;
+    commit(defaultState());
+  });
+  document.querySelectorAll(".preset-row button[data-duration]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      if (state.timer.running){ alert("Pause o cronômetro antes de mudar a duração."); return; }
+      var dur = parseInt(btn.getAttribute("data-duration"), 10);
+      var s = clone(state); s.timer.duration = dur; s.timer.remaining = dur; s.timer.running = false; s.timer.runningSince = null; s.timer.direction = "down";
+      commit(s);
+    });
+  });
+  document.getElementById("ctrl-start-pause").addEventListener("click", function(){
+    var s = clone(state);
+    if (s.timer.running){ s.timer.remaining = currentTimerValue(s.timer); s.timer.running = false; s.timer.runningSince = null; }
+    else {
+      if (s.timer.direction === "down" && s.timer.remaining <= 0){ alert("O tempo normal acabou. Use Zerar para reiniciar ou Golden Score em caso de empate."); return; }
+      s.timer.running = true; s.timer.runningSince = Date.now();
+    }
+    commit(s);
+  });
+  document.getElementById("ctrl-reset-timer").addEventListener("click", function(){
+    var s = clone(state); s.timer.remaining = s.timer.direction === "up" ? 0 : s.timer.duration; s.timer.running = false; s.timer.runningSince = null; commit(s);
+  });
+  document.getElementById("btn-start-golden").addEventListener("click", function(){
+    if (!confirm("Iniciar o Golden Score? O cronômetro passa a contar progressivamente a partir de 00:00.")) return;
+    var s = clone(state); s.timer = { duration: s.timer.duration, remaining: 0, running: true, runningSince: Date.now(), direction: "up" }; s.golden = true; commit(s);
+  });
+  document.getElementById("btn-end-golden").addEventListener("click", function(){
+    var s = clone(state); s.timer = { duration: s.timer.duration, remaining: s.timer.duration, running: false, runningSince: null, direction: "down" }; s.golden = false; commit(s);
+  });
+
+  function startOrSwitchOsaekomi(athlete){
+    var s = clone(state);
+    var o = s.osaekomi || { running: false, athlete: null, startedAt: null, baseSeconds: 0 };
+    if (o.running){ o.athlete = athlete; } else { o = { running: true, athlete: athlete, startedAt: Date.now(), baseSeconds: 0 }; }
+    s.osaekomi = o; commit(s);
+  }
+  function stopOsaekomi(award){
+    var s = clone(state); var o = s.osaekomi;
+    if (!o || (!o.running && !(o.baseSeconds > 0))) return;
+    var elapsed = currentOsaekomiValue(o);
+    if (award && o.athlete){
+      var key = o.athlete === "a" ? "athleteA" : "athleteB";
+      if (elapsed >= 20){ s[key].ippon = (s[key].ippon || 0) + 1; }
+      else if (elapsed >= 10){ s[key].wazaari = (s[key].wazaari || 0) + 1; }
+      else if (elapsed >= 5){ s[key].yuko = (s[key].yuko || 0) + 1; }
+    }
+    s.osaekomi = { running: false, athlete: null, startedAt: null, baseSeconds: 0 };
+    commit(s);
+  }
+  document.getElementById("osaekomi-a").addEventListener("click", function(){ startOrSwitchOsaekomi("a"); });
+  document.getElementById("osaekomi-b").addEventListener("click", function(){ startOrSwitchOsaekomi("b"); });
+  document.getElementById("osaekomi-toque").addEventListener("click", function(){ stopOsaekomi(true); });
+  document.getElementById("osaekomi-cancel").addEventListener("click", function(){ stopOsaekomi(false); });
+
+  // ---------- boot ----------
+  renderAll();
+  if (myRole && pairedCode){
+    if (libraryMissing()){
+      setConnStatus("bad", "Não consegui carregar a biblioteca de conexão — verifique a internet ou toque em Mudar modo.");
+    } else if (myRole === "display"){
+      document.getElementById("pairing-intro").textContent = "Reconectando ao código salvo…";
+      startAsHost(pairedCode);
+    } else if (myRole === "control"){
+      document.getElementById("pairing-intro").textContent = "Reconectando à TV…";
+      showScreen("control");
+      var p = new Peer();
+      p.on("open", function(){ peer = p; var c = peer.connect(pairedCode, {reliable:true}); wireClientConn(c, pairedCode); });
+      p.on("error", function(){ setConnStatus("bad", "Não foi possível reconectar. Toque em Mudar modo para parear de novo."); });
+    }
+  }
+})();
+</script>
+</body>
+</html>
