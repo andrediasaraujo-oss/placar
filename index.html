@@ -209,6 +209,7 @@
     </div>
 
     <div class="fineprint">A conexão usa WebRTC (a mesma tecnologia de chamadas de vídeo no navegador) e um serviço público gratuito só para os aparelhos se encontrarem uma vez — depois disso os dados trafegam direto entre os dois aparelhos, em tempo real.</div>
+    <div class="fineprint" style="opacity:0.4;">build: 2026-09-16-3</div>
   </div>
 
   <!-- DISPLAY (TV) -->
@@ -427,7 +428,7 @@
     try {
       peer = new Peer(code);
     } catch(e){
-      statusEl.className = "err"; statusEl.textContent = "Erro ao iniciar: " + e.message;
+      statusEl.className = "err"; statusEl.textContent = "Erro ao iniciar: " + e.message + " (typeof Peer=" + typeof Peer + ")";
       return;
     }
     setTimeout(function(){
