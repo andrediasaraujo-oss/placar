@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js" onerror="var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.1/dist/peerjs.min.js'; document.head.appendChild(s);"></script>
 <style>
   :root{
     --bg: #0b0d12;
@@ -307,6 +307,14 @@
   "use strict";
 
   function libraryMissing(){ return typeof Peer === "undefined"; }
+  function waitForPeerLib(cb){
+    if (typeof Peer !== "undefined"){ cb(true); return; }
+    var waited = 0;
+    var iv = setInterval(function(){
+      if (typeof Peer !== "undefined"){ clearInterval(iv); cb(true); }
+      else if ((waited += 300) >= 5000){ clearInterval(iv); cb(false); }
+    }, 300);
+  }
   var activeConn = null;
   var myRole = null;        // 'display' | 'control'
   var pairedCode = null;    // the TV's code, known by both sides
@@ -405,11 +413,16 @@
   function startAsHost(code){
     var statusEl = document.getElementById("pairing-status");
     statusEl.className = ""; statusEl.textContent = "Ativando…";
-    if (libraryMissing()){
-      statusEl.className = "err";
-      statusEl.textContent = "Não consegui carregar a biblioteca de conexão (peerjs.com). Pode ser bloqueio do site que hospeda este arquivo, ou falta de internet na TV.";
-      return;
-    }
+    waitForPeerLib(function(ok){
+      if (!ok){
+        statusEl.className = "err";
+        statusEl.textContent = "Não consegui carregar a biblioteca de conexão (peerjs.com), nem pelo provedor principal nem pelo backup. Verifique a internet da TV.";
+        return;
+      }
+      doStartAsHost(code, statusEl);
+    });
+  }
+  function doStartAsHost(code, statusEl){
     var opened = false;
     try {
       peer = new Peer(code);
@@ -463,11 +476,16 @@
   function startAsClient(code){
     var statusEl = document.getElementById("pairing-status2");
     statusEl.className = ""; statusEl.textContent = "Conectando…";
-    if (libraryMissing()){
-      statusEl.className = "err";
-      statusEl.textContent = "Não consegui carregar a biblioteca de conexão (peerjs.com). Pode ser bloqueio do site que hospeda este arquivo, ou falta de internet.";
-      return;
-    }
+    waitForPeerLib(function(ok){
+      if (!ok){
+        statusEl.className = "err";
+        statusEl.textContent = "Não consegui carregar a biblioteca de conexão (peerjs.com), nem pelo provedor principal nem pelo backup. Verifique a internet.";
+        return;
+      }
+      doStartAsClient(code, statusEl);
+    });
+  }
+  function doStartAsClient(code, statusEl){
     try { peer = new Peer(); } catch(e){ statusEl.className = "err"; statusEl.textContent = "Erro ao iniciar: " + e.message; return; }
     var settled = false;
     setTimeout(function(){ if (!settled){ statusEl.className = "err"; statusEl.textContent = "Sem resposta em 12s. Confira a internet do celular e o código."; } }, 12000);
@@ -694,17 +712,18 @@
   // ---------- boot ----------
   renderAll();
   if (myRole && pairedCode){
-    if (libraryMissing()){
-      setConnStatus("bad", "Não consegui carregar a biblioteca de conexão — verifique a internet ou toque em Mudar modo.");
-    } else if (myRole === "display"){
+    if (myRole === "display"){
       document.getElementById("pairing-intro").textContent = "Reconectando ao código salvo…";
       startAsHost(pairedCode);
     } else if (myRole === "control"){
       document.getElementById("pairing-intro").textContent = "Reconectando à TV…";
       showScreen("control");
-      var p = new Peer();
-      p.on("open", function(){ peer = p; var c = peer.connect(pairedCode, {reliable:true}); wireClientConn(c, pairedCode); });
-      p.on("error", function(){ setConnStatus("bad", "Não foi possível reconectar. Toque em Mudar modo para parear de novo."); });
+      waitForPeerLib(function(ok){
+        if (!ok){ setConnStatus("bad", "Não consegui carregar a biblioteca de conexão. Verifique a internet ou toque em Mudar modo."); return; }
+        var p = new Peer();
+        p.on("open", function(){ peer = p; var c = peer.connect(pairedCode, {reliable:true}); wireClientConn(c, pairedCode); });
+        p.on("error", function(){ setConnStatus("bad", "Não foi possível reconectar. Toque em Mudar modo para parear de novo."); });
+      });
     }
   }
 })();
